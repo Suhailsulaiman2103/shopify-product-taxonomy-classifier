@@ -1,0 +1,7 @@
+Django==6.1
+pandas==3.0.5
+openpyxl==3.1.5
+requests
+pillow
+mysqlclient==2.2.8
+python-dotenv

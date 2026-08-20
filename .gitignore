@@ -1,0 +1,18 @@
+venv/
+.env
+__pycache__/
+*.pyc
+
+db.sqlite3
+db.sqlite3.backup
+
+config/settings.py.backup
+
+classified_products.csv
+data/sample_products.xlsx
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Product List.xlsx

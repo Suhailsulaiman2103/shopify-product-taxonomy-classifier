@@ -1,0 +1,594 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Product Review
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{% static 'classifier/styles.css' %}"
+    >
+</head>
+
+
+<body>
+
+<div class="app-shell">
+
+    <header class="topbar">
+
+        <div>
+
+            <a
+                href="{% url 'dashboard' %}"
+                class="back-link"
+            >
+                ← Back to classifications
+            </a>
+
+            <h1>Product Review</h1>
+
+            <p>
+                Inspect and manage the predicted Shopify taxonomy classification.
+            </p>
+
+        </div>
+
+    </header>
+
+
+    <main>
+
+        <div class="review-grid">
+
+
+            <!-- Product information -->
+            <section class="panel">
+
+                <h2>Product</h2>
+
+
+                {% if product.image_1 %}
+
+                    <div class="product-image-wrapper">
+
+                        <img
+                            src="{{ product.image_1 }}"
+                            alt="{{ product.product_name }}"
+                            class="product-image"
+                        >
+
+                    </div>
+
+                {% else %}
+
+                    <div class="product-placeholder">
+                        No product image available
+                    </div>
+
+                {% endif %}
+
+
+                <h3>
+                    {{ product.product_name }}
+                </h3>
+
+
+                <dl class="detail-list">
+
+                    <div>
+                        <dt>Product Number</dt>
+
+                        <dd>
+                            {{ product.product_number }}
+                        </dd>
+                    </div>
+
+
+                    <div>
+                        <dt>Source Category</dt>
+
+                        <dd>
+                            {{ product.product_category|default:"Not available" }}
+                        </dd>
+                    </div>
+
+
+                    <div>
+                        <dt>Source Subcategory</dt>
+
+                        <dd>
+                            {{ product.product_sub_category|default:"Not available" }}
+                        </dd>
+                    </div>
+
+
+                    <div>
+                        <dt>Materials</dt>
+
+                        <dd>
+                            {{ product.materials|default:"Not available" }}
+                        </dd>
+                    </div>
+
+
+                    <div>
+                        <dt>Color</dt>
+
+                        <dd>
+                            {{ product.product_color|default:"Not available" }}
+                        </dd>
+                    </div>
+
+                </dl>
+
+            </section>
+
+
+
+            <!-- Classification information -->
+            <section class="panel">
+
+                <div class="classification-heading">
+
+                    <div>
+
+                        <h2>
+                            Classification
+                        </h2>
+
+                        <p>
+                            Shopify taxonomy prediction
+                        </p>
+
+                    </div>
+
+
+                    <span
+                        class="status status-{{ product.classification_status }}"
+                    >
+                        {{ product.classification_status|title }}
+                    </span>
+
+                </div>
+
+
+
+                <div class="prediction-box">
+
+                    <span>
+                        Predicted Category
+                    </span>
+
+                    <strong id="current-category">
+
+                        {{ product.predicted_category|default:"Not classified" }}
+
+                    </strong>
+
+                </div>
+
+
+
+                <div class="confidence-box">
+
+                    <span>
+                        Confidence
+                    </span>
+
+                    <strong>
+
+                        {% if product.confidence_score is not None %}
+
+                            {% widthratio product.confidence_score 1 100 %}%
+
+                        {% else %}
+
+                            —
+
+                        {% endif %}
+
+                    </strong>
+
+                </div>
+
+
+
+                <h3>
+                    Extracted Attributes
+                </h3>
+
+
+                <div class="attributes-grid">
+
+                    {% for key, value in product.predicted_attributes.items %}
+
+                        {% if key != "image_status" and key != "category_specific" %}
+
+                            <div class="attribute-card">
+
+                                <span>
+                                    {{ key|title }}
+                                </span>
+
+                                <strong>
+                                    {{ value }}
+                                </strong>
+
+                            </div>
+
+                        {% endif %}
+
+                    {% empty %}
+
+                        <p class="muted">
+                            No extracted attributes available.
+                        </p>
+
+                    {% endfor %}
+
+                </div>
+
+
+
+                {% if product.predicted_attributes.category_specific %}
+
+                    <h3>
+                        Category-Specific Attributes
+                    </h3>
+
+
+                    <div class="attributes-grid">
+
+                        {% for key, value in product.predicted_attributes.category_specific.items %}
+
+                            <div class="attribute-card">
+
+                                <span>
+                                    {{ key|title }}
+                                </span>
+
+                                <strong>
+                                    {{ value }}
+                                </strong>
+
+                            </div>
+
+                        {% endfor %}
+
+                    </div>
+
+                {% endif %}
+
+
+
+                {% if product.predicted_attributes.image_status %}
+
+                    <h3>
+                        Image Analysis
+                    </h3>
+
+
+                    <div class="attributes-grid">
+
+                        <div class="attribute-card">
+
+                            <span>
+                                Image Status
+                            </span>
+
+                            <strong>
+                                {{ product.predicted_attributes.image_status.status|title }}
+                            </strong>
+
+                        </div>
+
+
+                        {% if product.predicted_attributes.image_status.width %}
+
+                            <div class="attribute-card">
+
+                                <span>
+                                    Image Size
+                                </span>
+
+                                <strong>
+                                    {{ product.predicted_attributes.image_status.width }}
+                                    ×
+                                    {{ product.predicted_attributes.image_status.height }}
+                                </strong>
+
+                            </div>
+
+                        {% endif %}
+
+
+                        {% if product.predicted_attributes.image_status.visual_color %}
+
+                            <div class="attribute-card">
+
+                                <span>
+                                    Visual Color
+                                </span>
+
+                                <strong>
+                                    {{ product.predicted_attributes.image_status.visual_color }}
+                                </strong>
+
+                            </div>
+
+                        {% endif %}
+
+                    </div>
+
+                {% endif %}
+
+
+
+                <h3>
+                    Alternative Categories
+                </h3>
+
+
+                {% if product.alternative_categories %}
+
+                    <ul class="alternatives-list">
+
+                        {% for alternative in product.alternative_categories %}
+
+                            <li>
+                                {{ alternative }}
+                            </li>
+
+                        {% endfor %}
+
+                    </ul>
+
+                {% else %}
+
+                    <p class="muted">
+                        No alternative categories suggested.
+                    </p>
+
+                {% endif %}
+
+
+
+                <!-- Approval controls -->
+                <div class="review-actions">
+
+                    {% if product.classification_status == "approved" %}
+
+                        <button
+                            class="button button-secondary"
+                            onclick="revertApproval()"
+                        >
+                            Revert to Classified
+                        </button>
+
+                    {% else %}
+
+                        <button
+                            class="button button-success"
+                            onclick="approveProduct()"
+                        >
+                            Approve Classification
+                        </button>
+
+                    {% endif %}
+
+                </div>
+
+
+
+                <!-- Manual correction -->
+                <div class="manual-edit">
+
+                    <h3>
+                        Manual Category Correction
+                    </h3>
+
+                    <p>
+                        Enter a corrected Shopify taxonomy path if the prediction is not correct.
+                    </p>
+
+
+                    <textarea
+                        id="category-input"
+                        rows="3"
+                    >{{ product.predicted_category }}</textarea>
+
+
+                    <button
+                        class="button button-primary"
+                        onclick="updateCategory()"
+                    >
+                        Save Category
+                    </button>
+
+                </div>
+
+
+
+                <div
+                    id="message"
+                    class="message"
+                ></div>
+
+            </section>
+
+        </div>
+
+    </main>
+
+</div>
+
+
+{{ product.id|json_script:"product-id" }}
+
+
+<script>
+
+const productId = JSON.parse(
+    document.getElementById("product-id").textContent
+);
+
+
+async function approveProduct() {
+
+    const response = await fetch(
+        `/api/classifications/${productId}/approve/`,
+        {
+            method: "POST"
+        }
+    );
+
+    const data = await response.json();
+
+    showMessage(
+        data.message
+        || data.error
+        || "Classification approved."
+    );
+
+    if (response.ok) {
+
+        setTimeout(
+            () => window.location.reload(),
+            500
+        );
+
+    }
+
+}
+
+
+async function revertApproval() {
+
+    const response = await fetch(
+        `/api/classifications/${productId}/revert/`,
+        {
+            method: "POST"
+        }
+    );
+
+    const data = await response.json();
+
+    showMessage(
+        data.message
+        || data.error
+        || "Classification reverted."
+    );
+
+    if (response.ok) {
+
+        setTimeout(
+            () => window.location.reload(),
+            500
+        );
+
+    }
+
+}
+
+
+async function updateCategory() {
+
+    const category = document
+        .getElementById("category-input")
+        .value
+        .trim();
+
+
+    if (!category) {
+
+        showMessage(
+            "Please enter a Shopify taxonomy category."
+        );
+
+        return;
+
+    }
+
+
+    const response = await fetch(
+        `/api/classifications/${productId}/update/`,
+        {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                predicted_category: category
+            })
+        }
+    );
+
+
+    const data = await response.json();
+
+
+    if (response.ok) {
+
+        document
+            .getElementById("current-category")
+            .textContent = data.predicted_category;
+
+
+        showMessage(
+            data.message
+            || "Classification updated."
+        );
+
+
+        setTimeout(
+            () => window.location.reload(),
+            500
+        );
+
+        return;
+
+    }
+
+
+    showMessage(
+        data.error
+        || "Unable to update classification."
+    );
+
+}
+
+
+function showMessage(text) {
+
+    const message = document.getElementById(
+        "message"
+    );
+
+    message.textContent = text;
+
+    message.classList.add(
+        "message-visible"
+    );
+
+}
+
+</script>
+
+
+</body>
+
+</html>

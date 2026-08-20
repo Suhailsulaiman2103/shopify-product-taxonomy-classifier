@@ -1,0 +1,380 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Shopify Product Taxonomy Classifier</title>
+
+    <link
+        rel="stylesheet"
+        href="{% static 'classifier/styles.css' %}"
+    >
+</head>
+
+<body>
+
+<div class="app-shell">
+
+    <header class="topbar">
+        <div>
+            <h1>Shopify Product Taxonomy Classifier</h1>
+
+            <p>
+                Product classification, confidence,
+                attributes and manual review
+            </p>
+        </div>
+
+        <div class="topbar-badge">
+            Django Prototype
+        </div>
+    </header>
+
+
+    <main>
+
+        <section class="stats-grid">
+
+            <div class="stat-card">
+                <span class="stat-label">
+                    Total Products
+                </span>
+
+                <strong class="stat-number">
+                    {{ total_products }}
+                </strong>
+            </div>
+
+
+            <div class="stat-card">
+                <span class="stat-label">
+                    Classified
+                </span>
+
+                <strong class="stat-number">
+                    {{ classified_count }}
+                </strong>
+            </div>
+
+
+            <div class="stat-card">
+                <span class="stat-label">
+                    Approved
+                </span>
+
+                <strong class="stat-number">
+                    {{ approved_count }}
+                </strong>
+            </div>
+
+
+            <div class="stat-card">
+                <span class="stat-label">
+                    Manual Review
+                </span>
+
+                <strong class="stat-number">
+                    {{ manual_review_count }}
+                </strong>
+            </div>
+
+
+            <div class="stat-card">
+                <span class="stat-label">
+                    Failed
+                </span>
+
+                <strong class="stat-number">
+                    {{ failed_count }}
+                </strong>
+            </div>
+
+        </section>
+
+
+        <section class="panel">
+
+            <div class="panel-heading">
+
+                <div>
+                    <h2>Classification Results</h2>
+
+                    <p>
+                        Review predicted Shopify categories
+                        and classification confidence.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <form
+                method="get"
+                class="filters"
+            >
+
+                <input
+                    type="text"
+                    name="search"
+                    value="{{ search }}"
+                    placeholder="Search product name..."
+                >
+
+
+                <select name="status">
+
+                    <option value="">
+                        All statuses
+                    </option>
+
+                    <option
+                        value="classified"
+                        {% if status == "classified" %}
+                            selected
+                        {% endif %}
+                    >
+                        Classified
+                    </option>
+
+                    <option
+                        value="approved"
+                        {% if status == "approved" %}
+                            selected
+                        {% endif %}
+                    >
+                        Approved
+                    </option>
+
+                    <option
+                        value="manual_review"
+                        {% if status == "manual_review" %}
+                            selected
+                        {% endif %}
+                    >
+                        Manual Review
+                    </option>
+
+                    <option
+                        value="failed"
+                        {% if status == "failed" %}
+                            selected
+                        {% endif %}
+                    >
+                        Failed
+                    </option>
+
+                </select>
+
+
+                <button
+                    type="submit"
+                    class="button button-primary"
+                >
+                    Filter
+                </button>
+
+
+                <a
+                    href="{% url 'dashboard' %}"
+                    class="button button-secondary"
+                >
+                    Reset
+                </a>
+
+            </form>
+
+
+            <div class="table-container">
+
+                <table>
+
+                    <thead>
+
+                    <tr>
+                        <th>Product</th>
+                        <th>Source</th>
+                        <th>Predicted Category</th>
+                        <th>Confidence</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                    {% for product in page_obj %}
+
+                        <tr>
+
+                            <td>
+
+                                <div class="product-cell">
+
+                                    {% if product.image_1 %}
+                                        <img
+                                            src="{{ product.image_1 }}"
+                                            alt="{{ product.product_name }}"
+                                            class="product-thumb"
+                                        >
+                                    {% else %}
+                                        <div class="product-placeholder">
+                                            No image
+                                        </div>
+                                    {% endif %}
+
+                                    <div>
+
+                                        <strong>
+                                            {{ product.product_name }}
+                                        </strong>
+
+                                        <small>
+                                            {{ product.product_number }}
+                                        </small>
+
+                                    </div>
+
+                                </div>
+
+                            </td>
+
+
+                            <td>
+
+                                {{ product.product_category }}
+
+                                <small>
+                                    {{ product.product_sub_category }}
+                                </small>
+
+                            </td>
+
+
+                            <td class="category-cell">
+
+                                {% if product.predicted_category %}
+                                    {{ product.predicted_category }}
+                                {% else %}
+                                    <span class="muted">
+                                        Not classified
+                                    </span>
+                                {% endif %}
+
+                            </td>
+
+
+                            <td>
+
+                                {% if product.confidence_score %}
+
+                                    <span class="confidence">
+
+                                        {% widthratio product.confidence_score 1 100 %}%
+
+                                    </span>
+
+                                {% else %}
+
+                                    —
+
+                                {% endif %}
+
+                            </td>
+
+
+                            <td>
+
+                                <span class="status status-{{ product.classification_status }}">
+
+                                    {{ product.classification_status|title }}
+
+                                </span>
+
+                            </td>
+
+
+                            <td>
+
+                                <a
+                                    class="button button-small"
+                                    href="{% url 'product-review' product.id %}"
+                                >
+                                    Review
+                                </a>
+
+                            </td>
+
+                        </tr>
+
+                    {% empty %}
+
+                        <tr>
+
+                            <td
+                                colspan="6"
+                                class="empty-state"
+                            >
+                                No products found.
+                            </td>
+
+                        </tr>
+
+                    {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+
+            <div class="pagination">
+
+                <div>
+                    Page {{ page_obj.number }}
+                    of {{ page_obj.paginator.num_pages }}
+                </div>
+
+
+                <div class="pagination-actions">
+
+                    {% if page_obj.has_previous %}
+
+                        <a
+                            class="button button-secondary"
+                            href="?page={{ page_obj.previous_page_number }}&search={{ search }}&status={{ status }}"
+                        >
+                            Previous
+                        </a>
+
+                    {% endif %}
+
+
+                    {% if page_obj.has_next %}
+
+                        <a
+                            class="button button-secondary"
+                            href="?page={{ page_obj.next_page_number }}&search={{ search }}&status={{ status }}"
+                        >
+                            Next
+                        </a>
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+</html>
