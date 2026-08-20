@@ -2,7 +2,9 @@
 
 A Django-based product classification system that maps product catalog data to Shopify's hierarchical product taxonomy.
 
-The system imports product data from Excel, classifies products into Shopify taxonomy categories, extracts product and category-aware attributes, calculates confidence scores, suggests alternative categories, supports manual review, optionally analyzes product images, and exposes classification results through a review API.
+The application imports product data from Excel, classifies products into Shopify taxonomy categories, extracts structured and category-aware attributes, calculates confidence scores, suggests alternative categories, supports manual review and correction, optionally analyzes product images, and provides a web-based review dashboard and REST-style classification API.
+
+---
 
 ## Features
 
@@ -10,7 +12,7 @@ The system imports product data from Excel, classifies products into Shopify tax
 - Imports Shopify hierarchical taxonomy data
 - Classifies products into Shopify taxonomy categories
 - Extracts structured product attributes
-- Extracts category-aware attributes
+- Extracts category-specific attributes
 - Detects brand information from product titles
 - Generates confidence scores
 - Suggests alternative categories
@@ -19,42 +21,57 @@ The system imports product data from Excel, classifies products into Shopify tax
 - Handles missing or broken images without interrupting processing
 - Processes products in configurable batches
 - Supports resumable classification
+- Supports deliberate reprocessing
 - Isolates individual product failures
-- Stores classification results in the database
+- Stores classification results in MariaDB
 - Exports classified products to CSV
-- Provides REST-style endpoints for reviewing classifications
-- Supports manual approval and category correction
+- Provides a web-based classification review dashboard
+- Provides REST-style endpoints for classification review
+- Supports classification approval
+- Supports reverting approved classifications
+- Supports manual category correction
 - Includes automated tests
+
+---
 
 ## Project Results
 
-The supplied product catalog contains 4,999 products.
-
-Current validation results:
+The application was validated locally using the supplied assessment catalog containing **4,999 products**.
 
 ```text
-Total products:              4999
-Automatically classified:    4999
-Manual review:               0
+Total products:               4999
+Automatically classified:     4999
+Manual review:                   0
 Classification rate:         100.00%
-Failed products:             0
-Automated tests:             13 passing
+Failed products:                 0
+Automated tests:                13 passing
 ```
 
+The **100% classification rate represents classification coverage, not independently measured classification accuracy**.
+
 The manual-review workflow was also tested separately using unknown product data to verify that uncertain products can be flagged and provided with alternative category suggestions.
+
+---
 
 ## Technology Stack
 
 - Python
 - Django
-- SQLite
+- MariaDB
+- Django ORM
 - pandas
 - openpyxl
 - Requests
 - Pillow
+- HTML
+- CSS
+- JavaScript
 - Shopify Product Taxonomy
+- Git & GitHub
 
-SQLite is used for the prototype. Because database access is handled through the Django ORM, the application can be migrated to MariaDB or another supported relational database for production deployment.
+MariaDB is used as the relational database for the final prototype. Django ORM provides the database abstraction layer used throughout the application.
+
+---
 
 ## Project Structure
 
@@ -69,11 +86,20 @@ shopify_product_classifier/
 │   ├── urls.py
 │   ├── views.py
 │   │
-│   └── management/
-│       └── commands/
-│           ├── classify_products.py
-│           ├── export_classified_products.py
-│           └── validate_classification.py
+│   ├── management/
+│   │   └── commands/
+│   │       ├── classify_products.py
+│   │       ├── export_classified_products.py
+│   │       └── validate_classification.py
+│   │
+│   ├── templates/
+│   │   └── classifier/
+│   │       ├── dashboard.html
+│   │       └── product_detail.html
+│   │
+│   └── static/
+│       └── classifier/
+│           └── styles.css
 │
 ├── products/
 │   ├── models.py
@@ -96,8 +122,11 @@ shopify_product_classifier/
 │
 ├── manage.py
 ├── requirements.txt
+├── .gitignore
 └── README.md
 ```
+
+---
 
 ## Classification Pipeline
 
@@ -108,7 +137,7 @@ Product Catalog
 Product Import
       │
       ▼
-Text + Structured Product Data
+Structured Product Data
       │
       ├── Product Name
       ├── Description
@@ -117,12 +146,13 @@ Text + Structured Product Data
       ├── Materials
       ├── Color
       ├── Brand
-      └── Optional Image
+      └── Optional Images
       │
       ▼
 Hierarchical Classifier
       │
-      ├── Source-aware keyword rules
+      ├── Source-aware rules
+      ├── Keyword matching
       ├── Shopify taxonomy lookup
       ├── Confidence scoring
       └── Alternative suggestions
@@ -131,26 +161,54 @@ Hierarchical Classifier
 Attribute Extraction
       │
       ├── Generic attributes
-      ├── Category-aware attributes
-      └── Optional image signal
+      ├── Category-specific attributes
+      └── Optional image signals
       │
       ▼
 Classification Result
       │
       ├── Predicted Category
-      ├── Attributes
+      ├── Extracted Attributes
       ├── Confidence Score
       ├── Alternative Categories
       ├── Manual Review Flag
       └── Processing Status
       │
       ▼
-Database / Review API / CSV Export
+MariaDB
+      │
+      ├── Review Dashboard
+      ├── Classification API
+      └── CSV Export
 ```
+
+---
+
+## Shopify Product Taxonomy
+
+The application maps products to Shopify's hierarchical product taxonomy.
+
+The taxonomy is stored as parent-child categories so classifications can represent paths such as:
+
+```text
+Furniture
+    >
+Tables
+    >
+Accent Tables
+    >
+End Tables
+```
+
+The taxonomy import command reads the taxonomy source and stores category identifiers, names, full paths, and parent relationships in MariaDB.
+
+This allows the classifier to work with hierarchical category paths rather than a flat list of labels.
+
+---
 
 ## Attribute Extraction
 
-The system extracts structured attributes already available in the catalog, including:
+The system extracts structured attributes already available in the product catalog, including:
 
 - Color
 - Materials
@@ -161,43 +219,59 @@ The system extracts structured attributes already available in the catalog, incl
 - Product type
 - Brand
 
-It also derives category-aware attributes.
-
-Examples:
+Boolean-like source values are normalized into human-readable values such as:
 
 ```text
-Empress Bonded Leather Sofa
-Category: Furniture > Sofas
+Y     → Yes
+N     → No
+true  → Yes
+false → No
+```
 
-Category-specific attribute:
+The system also derives category-specific attributes.
+
+### Example: Sofa
+
+```text
+Product:
+Empress Bonded Leather Sofa
+
+Predicted Category:
+Furniture > Sofas
+
+Category-Specific Attribute:
 upholstery_material = Leather
 ```
 
-```text
-Track Round Dining Table
-Category: Furniture > Tables > Dining Tables
+### Example: Table
 
-Category-specific attribute:
+```text
+Product:
+Track Round Dining Table
+
+Category-Specific Attribute:
 table_shape = Round
 ```
 
-The attribute extraction layer is extensible so additional category-specific rules can be added without modifying the primary classifier.
+The attribute extraction component is separated from the main classifier so additional category-specific extraction rules can be introduced without redesigning the classification pipeline.
+
+---
 
 ## Image Handling
 
-Image processing is optional because remote image requests increase classification time.
+Image processing is optional because remote image requests can significantly increase classification time.
 
-When enabled, the system:
+When image checking is enabled, the system:
 
-1. Finds the first available product image.
+1. Finds an available product image.
 2. Validates the image URL.
-3. Downloads the image safely with a timeout.
+3. Downloads the image using a request timeout.
 4. Verifies that the response contains an image.
 5. Reads image dimensions.
 6. Calculates a lightweight visual color signal.
-7. Continues classification even if the image is missing or inaccessible.
+7. Continues processing if an image is unavailable or broken.
 
-Example:
+Example image analysis result:
 
 ```json
 {
@@ -209,22 +283,27 @@ Example:
 }
 ```
 
-Structured catalog attributes take priority over image-derived values. Visual information is treated as a secondary signal.
+Structured catalog attributes take priority over image-derived information. Image analysis is treated as a secondary signal.
 
-For a production system, the image service can be extended with a multimodal or vision model for richer image-based classification.
+For a production implementation, this component could be extended with a multimodal or computer-vision model.
+
+---
 
 ## Confidence and Manual Review
 
-Each classification includes a confidence score.
+Every classification includes a confidence score.
 
-High-confidence rule matches are classified automatically.
+High-confidence rule matches can be classified automatically.
 
-If the classifier cannot determine a reliable category, the product is marked for manual review:
+If the classifier cannot determine a reliable taxonomy mapping, the product can be flagged for manual review.
+
+Example:
 
 ```json
 {
   "category": null,
   "confidence": 0.0,
+  "reason": "No reliable taxonomy mapping was found.",
   "alternatives": [
     "Furniture > Sofas",
     "Furniture > Ottomans",
@@ -234,11 +313,13 @@ If the classifier cannot determine a reliable category, the product is marked fo
 }
 ```
 
-This prevents uncertain classifications from being silently accepted.
+This prevents uncertain classifications from being silently treated as reliable results.
+
+---
 
 ## Batch Processing and Failure Recovery
 
-Products are processed in configurable batches.
+Products can be processed in configurable batches.
 
 Example:
 
@@ -246,7 +327,7 @@ Example:
 python manage.py classify_products --batch-size 500
 ```
 
-Already classified products are skipped during normal execution, allowing interrupted classification jobs to resume without starting from the beginning.
+Products that have already been processed are skipped during normal execution, allowing an interrupted classification run to resume without starting from the beginning.
 
 To deliberately reprocess existing products:
 
@@ -266,51 +347,103 @@ Image validation can be enabled when required:
 python manage.py classify_products --check-images --reprocess --limit 10
 ```
 
-If one product fails, it is marked with a failed status while the remaining products continue processing.
+If an individual product fails during processing, the failure is isolated so the remaining products can continue.
 
-This provides a lightweight resumable processing design for the prototype.
+This provides lightweight resumable batch processing for the prototype.
 
-For production workloads involving slow external AI APIs, the same classification service can be executed through background workers such as Celery with Redis.
+---
 
-## API
+## Review Dashboard
 
-Start the Django development server:
+The project includes a Django-based web interface for reviewing classification results.
+
+The dashboard provides:
+
+- Total product count
+- Classified product count
+- Approved product count
+- Manual-review count
+- Failed-product count
+- Product search
+- Status filtering
+- Pagination
+- Product images
+- Source categories
+- Predicted Shopify categories
+- Confidence scores
+- Classification status
+- Individual product review pages
+
+### Product Review
+
+The product review page displays:
+
+- Product image
+- Product number
+- Source category
+- Source subcategory
+- Materials
+- Color
+- Predicted Shopify category
+- Confidence score
+- Extracted attributes
+- Category-specific attributes
+- Image-analysis information
+- Alternative category suggestions
+
+The reviewer can also:
+
+- Approve a classification
+- Revert an approval back to classified
+- Manually correct a predicted taxonomy category
+
+---
+
+## Classification API
+
+Start the development server:
 
 ```bash
 python manage.py runserver
 ```
 
-### List classifications
+### List Classifications
 
-```text
+```http
 GET /api/classifications/
 ```
 
 Optional status filtering:
 
-```text
+```http
 GET /api/classifications/?status=classified
 ```
 
-### View one classification
+### View a Classification
 
-```text
+```http
 GET /api/classifications/<product_id>/
 ```
 
-### Approve a classification
+### Approve a Classification
 
-```text
+```http
 POST /api/classifications/<product_id>/approve/
 ```
 
-### Update a classification
+### Revert an Approval
 
-```text
+```http
+POST /api/classifications/<product_id>/revert/
+```
+
+### Update a Classification
+
+```http
 POST /api/classifications/<product_id>/update/
 ```
 
-Example JSON request:
+Example request:
 
 ```json
 {
@@ -318,52 +451,120 @@ Example JSON request:
 }
 ```
 
-The prototype API allows classification results to be viewed, approved, and manually corrected.
+The API supports viewing, approving, reverting, and manually correcting classification results.
 
-## Setup
+---
 
-### 1. Clone the repository
+# Setup
+
+## 1. Clone the Repository
 
 ```bash
 git clone <repository-url>
-cd shopify_product_classifier
+cd shopify-product-taxonomy-classifier
 ```
 
-### 2. Create a virtual environment
+---
 
-Windows:
+## 2. Create a Virtual Environment
+
+### Windows
 
 ```bash
 python -m venv venv
 venv\Scripts\activate
 ```
 
-macOS/Linux:
+### macOS/Linux
 
 ```bash
 python -m venv venv
 source venv/bin/activate
 ```
 
-### 3. Install dependencies
+---
+
+## 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Run migrations
+---
+
+## 4. Configure MariaDB
+
+Create a MariaDB database:
+
+```sql
+CREATE DATABASE shopify_classifier
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+```
+
+Create a dedicated application user:
+
+```sql
+CREATE USER 'shopify_app'@'localhost'
+IDENTIFIED BY 'your-password';
+```
+
+Grant access:
+
+```sql
+GRANT ALL PRIVILEGES
+ON shopify_classifier.*
+TO 'shopify_app'@'localhost';
+
+FLUSH PRIVILEGES;
+```
+
+---
+
+## 5. Configure Environment Variables
+
+Create a `.env` file in the project root.
+
+```text
+DB_NAME=shopify_classifier
+DB_USER=shopify_app
+DB_PASSWORD=your-password
+DB_HOST=localhost
+DB_PORT=3306
+
+DJANGO_SECRET_KEY=your-django-secret-key
+DEBUG=True
+```
+
+The `.env` file is excluded from Git and should never be committed.
+
+A Django secret key can be generated with:
+
+```bash
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+---
+
+## 6. Run Database Migrations
 
 ```bash
 python manage.py migrate
 ```
 
-### 5. Import Shopify taxonomy
+---
+
+## 7. Import Shopify Taxonomy
 
 ```bash
 python manage.py import_taxonomy
 ```
 
-### 6. Import products
+---
+
+## 8. Import Products
+
+The original assessment product catalog is intentionally not included in this repository.
 
 Place the supplied Excel product file in the project root as:
 
@@ -377,119 +578,228 @@ Then run:
 python manage.py import_products
 ```
 
-### 7. Classify products
+---
+
+## 9. Classify Products
 
 ```bash
 python manage.py classify_products
 ```
 
-### 8. Validate classifications
+For configurable batch processing:
+
+```bash
+python manage.py classify_products --batch-size 500
+```
+
+---
+
+## 10. Validate Classification
 
 ```bash
 python manage.py validate_classification
 ```
 
-### 9. Export results
+---
+
+## 11. Run the Web Application
+
+```bash
+python manage.py runserver
+```
+
+Open:
+
+```text
+http://127.0.0.1:8000/
+```
+
+---
+
+## 12. Export Results
 
 ```bash
 python manage.py export_classified_products
 ```
 
-The generated file is:
+The generated output is:
 
 ```text
 classified_products.csv
 ```
 
+The generated classification export is excluded from Git.
+
+---
+
 ## Testing
 
-Run:
+Run the complete automated test suite:
 
 ```bash
 python manage.py test
 ```
 
-Current result:
+Current validated result:
 
 ```text
 Found 13 test(s).
 .............
+----------------------------------------------------------------------
+Ran 13 tests
+
 OK
 ```
 
-Tests cover core classification behavior, classification API operations, and image failure handling.
+The tests cover core classification behavior, classification API operations, attribute extraction, and image failure handling.
+
+---
+
+## Dataset
+
+The original product catalog used for this assessment is **not included in this repository** because it was supplied specifically for evaluation purposes.
+
+The application was validated locally using the supplied catalog containing:
+
+```text
+4,999 products
+```
+
+To evaluate the project using the original assessment data, place the supplied Excel file in the project root as:
+
+```text
+Product List.xlsx
+```
+
+Then run:
+
+```bash
+python manage.py import_products
+python manage.py classify_products
+python manage.py validate_classification
+```
+
+Generated classification exports and local databases are also excluded from version control.
+
+---
+
+## Security
+
+Sensitive configuration is loaded through environment variables rather than being hardcoded in the source code.
+
+The following files are excluded from Git:
+
+```text
+.env
+Product List.xlsx
+classified_products.csv
+db.sqlite3
+db.sqlite3.backup
+venv/
+```
+
+Database credentials and the Django secret key should never be committed to the repository.
+
+---
+
+## Design Decisions
+
+The prototype uses deterministic hierarchical rules as its primary classification mechanism.
+
+This approach was selected because it provides:
+
+- Predictable behavior
+- Explainable classifications
+- Fast local execution
+- No dependency on paid AI APIs
+- Straightforward debugging
+- Easy addition of domain-specific rules
+
+The classifier, attribute extractor, image service, persistence layer, API, and user interface are separated so individual components can be extended without redesigning the complete application.
+
+Django ORM is used for persistence, with MariaDB providing the relational database for the final implementation.
+
+---
 
 ## Scalability
 
 The prototype processes products in resumable batches and isolates failures at the individual-product level.
 
-For a production-scale implementation involving 10,000+ products and external AI requests, the recommended architecture would be:
+For larger production workloads involving external AI services, a possible architecture would be:
 
 ```text
-Django API
-    │
-    ▼
+Django Application
+       │
+       ▼
 Task Queue
-    │
-    ▼
+       │
+       ▼
 Redis
-    │
-    ▼
+       │
+       ▼
 Celery Workers
-    │
-    ├── Product batch 1
-    ├── Product batch 2
-    ├── Product batch 3
-    └── ...
-    │
-    ▼
+       │
+       ├── Product Batch 1
+       ├── Product Batch 2
+       ├── Product Batch 3
+       └── ...
+       │
+       ▼
 Classification Service
-    │
-    ▼
+       │
+       ▼
 MariaDB
 ```
 
-This allows multiple batches to be processed concurrently while preserving retry, progress, and failure information.
+This would allow classification workloads to be processed asynchronously while supporting retries, progress tracking, and multiple workers.
 
-## Design Decisions
-
-The classifier uses deterministic hierarchical rules as its primary classification mechanism.
-
-This approach was selected for the prototype because it provides:
-
-- Predictable results
-- Explainable classifications
-- Fast execution
-- No dependency on paid AI APIs
-- Easy debugging
-- Easy addition of domain-specific rules
-
-The classifier is separated from image processing and attribute extraction so these components can later be replaced or extended with machine-learning or multimodal models without redesigning the rest of the application.
+---
 
 ## Future Improvements
 
 Potential production improvements include:
 
 - Celery and Redis background processing
-- MariaDB deployment
 - Multimodal image classification
 - Semantic embedding-based taxonomy matching
 - Authentication and authorization for review endpoints
-- Pagination for classification results
-- Bulk approval workflow
+- Bulk approval workflows
 - Detailed audit history for manual corrections
 - Monitoring and retry dashboards
-- Automated taxonomy synchronization
+- Automated Shopify taxonomy synchronization
+- More comprehensive automated test coverage
+- Production deployment configuration
 
-## Dataset
+---
 
-The original product catalog used for this assessment is not included in this repository because it was provided for evaluation purposes.
+## Taxonomy Source
 
-To run the project with the supplied assessment dataset, place the Excel file in the project root as:
+The classification system uses Shopify Product Taxonomy data as the taxonomy source.
 
-```text
-Product List.xlsx
+The taxonomy is imported into the application and represented hierarchically using parent-child relationships.
+
+---
 
 ## Summary
 
-This project demonstrates an end-to-end product taxonomy classification workflow including product ingestion, Shopify taxonomy mapping, structured and category-aware attribute extraction, confidence scoring, alternative suggestions, manual review, image handling, resumable batch processing, persistence, export, automated testing, and classification review APIs.
+This project demonstrates an end-to-end product taxonomy classification workflow including:
+
+- Product ingestion
+- Shopify taxonomy mapping
+- Hierarchical classification
+- Structured attribute extraction
+- Category-aware attribute extraction
+- Confidence scoring
+- Alternative category suggestions
+- Manual-review fallback
+- Optional image analysis
+- Resumable batch processing
+- Failure isolation
+- MariaDB persistence
+- REST-style classification APIs
+- Web-based review dashboard
+- Approval and correction workflows
+- CSV export
+- Automated testing
+
+The result is a functional prototype designed to demonstrate both the classification workflow and how it could evolve into a larger production system.
